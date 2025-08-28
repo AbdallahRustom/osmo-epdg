@@ -66,7 +66,7 @@
 
 -record(ue_fsm_data, {
         imsi,
-        apn                     = "internet"    :: string(),
+        apn                     = "ims"    :: string(),
         pgw_rem_addr_list       = []            :: list(),
         tun_pdp_ctx                             :: #epdg_tun_pdp_ctx{},
         tear_down_gsup_needed   = false         :: boolean(), %% need to send GSUP PurgeMSResp after STR+STA?
