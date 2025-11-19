@@ -281,9 +281,9 @@ terminate(_Reason, _State) ->
 %% ------------------------------------------------------------------
 
 %% Add Re-Synchronization-Info if provided (RAND||AUTS) via generic AVP bucket
-maybe_add_resync(MAR = #'MAR'{'AVP' := AVPs}, undefined) ->
+maybe_add_resync(MAR = #'MAR'{'AVP' = AVPs}, undefined) ->
     MAR#'MAR'{'AVP' = AVPs};
-maybe_add_resync(MAR = #'MAR'{'AVP' := AVPs}, {RandBin, AutsBin})
+maybe_add_resync(MAR = #'MAR'{'AVP' = AVPs}, {RandBin, AutsBin})
   when is_binary(RandBin), byte_size(RandBin) =:= 16,
        is_binary(AutsBin), byte_size(AutsBin) =:= 14 ->
     ResyncInfo = <<RandBin/binary, AutsBin/binary>>,  % 30 bytes
