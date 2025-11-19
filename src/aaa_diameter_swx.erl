@@ -34,7 +34,6 @@
 % for the parts of the runtime libraries of Erlang/OTP used as well as
 % that of the covered work.
 
-
 -module(aaa_diameter_swx).
 -author('Alexander Couzens <lynxis@fe80.eu>').
 
@@ -77,9 +76,8 @@
 -define(VENDOR_ID_3GPP2, 5535).
 -define(VENDOR_ID_ETSI, 13019).
 -define(DIAMETER_APP_ID_SWX, ?DIAMETER_DICT_SWX:id()).
-%% The service configuration. As in the server example, a client
-%% supporting multiple Diameter applications may or may not want to
-%% configure a common callback module on all applications.
+
+%% The service configuration
 -define(SERVICE,
         [{'Origin-Host', application:get_env(?ENV_APP_NAME, dia_swx_origin_host, ?ENV_DEFAULT_ORIG_HOST)},
          {'Origin-Realm', application:get_env(?ENV_APP_NAME, dia_swx_origin_realm, ?ENV_DEFAULT_ORIG_REALM)},
@@ -89,7 +87,6 @@
                  'Vendor-Id'           = ?VENDOR_ID_3GPP,
                  'Auth-Application-Id' = [?DIAMETER_APP_ID_SWX]}]},
          {'Product-Name', "osmo-epdg"},
-         % TODO: check which we should annouce here as Supported-Vendor-Id
          {'Supported-Vendor-Id', [?VENDOR_ID_3GPP, ?VENDOR_ID_ETSI, ?VENDOR_ID_3GPP2]},
          { application,
           [{alias, ?APP_ALIAS},
@@ -118,7 +115,6 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 peer_down(API, SvcName, {PeerRef, _} = Peer) ->
-    % fixme: why do we still have ets here?
     (catch ets:delete(?MODULE, {API, PeerRef})),
     gen_server:cast(?SERVER, {peer_down, SvcName, Peer}),
     ok.
@@ -132,7 +128,6 @@ init([]) ->
     WatchdogConfig = application:get_env(?ENV_APP_NAME, dia_swx_watchdog_config, ?ENV_DEFAULT_DIAMETER_WATCHDOG_CFG),
     TxTimer = application:get_env(?ENV_APP_NAME, dia_swx_transmit_timer, ?ENV_DEFAULT_DIAMETER_TRANSMIT_TIMER_MS),
     ok = diameter:start_service(?MODULE, ?SERVICE),
-    % lager:info("DiaServices is ~p~n", [DiaServ]),
     {ok, _} = connect({address, Proto, Ip, Port}, {timer, ConnectTimer, WatchdogTimer, WatchdogConfig}),
     {ok, #swx_state{tx_timeout = TxTimer}}.
 
@@ -149,17 +144,16 @@ multimedia_auth_request(IMSI, RAT, NumAuthItems, AuthScheme, PdpTypeNr, Authoriz
 %% New /7 API: ResyncInfoOpt = {RandBin, AutsBin} | undefined
 multimedia_auth_request(IMSI, RAT, NumAuthItems, AuthScheme, PdpTypeNr, AuthorizationOpt, ResyncInfoOpt) ->
     gen_server:call(?SERVER,
-                          {mar, {IMSI, RAT, NumAuthItems, AuthScheme, PdpTypeNr, AuthorizationOpt, ResyncInfoOpt}}).
+                    {mar, {IMSI, RAT, NumAuthItems, AuthScheme, PdpTypeNr, AuthorizationOpt, ResyncInfoOpt}}).
+
 % APN is optional and should be []
 server_assignment_request(IMSI, Type, APN, AgentInfoOpt) ->
     gen_server:call(?SERVER,
-                          {sar, {IMSI, Type, APN, AgentInfoOpt}}).
+                    {sar, {IMSI, Type, APN, AgentInfoOpt}}).
 
 result_code_success(2001) -> ok;
 result_code_success(2002) -> ok;
 result_code_success(_) -> invalid_result_code.
-
-% TODO Sync failure
 
 -define (MAA_Errors(), #{
     invalid_result_code => #{error => "Unknown result code"},
@@ -168,26 +162,25 @@ result_code_success(_) -> invalid_result_code.
 }).
 
 -spec parse_maa(#'MAA'{}) -> map().
-parse_maa(#'MAA'{'Result-Code' = [ResultCode]} = Maa) ->
+parse_maa(#'MAA'{'Result-Code' = [ResultCode]} = _Maa) ->
     Success = result_code_success(ResultCode),
     {Success, ResultCode};
-parse_maa(#'MAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := 5001}]} = Maa) ->
+parse_maa(#'MAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := 5001}]} = _Maa) ->
     {unknown_user, 5001};
-parse_maa(#'MAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := ResultCode}]} = Maa) ->
+parse_maa(#'MAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := ResultCode}]} = _Maa) ->
     {invalid_exp_result, ResultCode};
-parse_maa(Maa) ->
+parse_maa(_Maa) ->
     {unknown_err, []}.
-% parse_maa(#'MAA'{'Experimental-Result-Code' = [ResultCode] = MAA) ->
 
 -spec parse_saa(#'SAA'{}) -> map().
-parse_saa(#'SAA'{'Result-Code' = [ResultCode]} = Saa) ->
+parse_saa(#'SAA'{'Result-Code' = [ResultCode]} = _Saa) ->
     Success = result_code_success(ResultCode),
     {Success, ResultCode};
-parse_saa(#'SAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := 5001}]} = Saa) ->
+parse_saa(#'SAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := 5001}]} = _Saa) ->
     {unknown_user, 5001};
-parse_saa(#'SAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := ResultCode}]} = Saa) ->
+parse_saa(#'SAA'{'Experimental-Result' = [#{'Vendor-Code' := ?VENDOR_ID_3GPP, 'ExpResultCode' := ResultCode}]} = _Saa) ->
     {invalid_exp_result, ResultCode};
-parse_saa(Saa) ->
+parse_saa(_Saa) ->
     {unknown_err, []}.
 
 %% Backward-compat: /6 MAR forwards to /7 with ResyncInfoOpt = undefined
@@ -197,11 +190,9 @@ handle_call({mar, {IMSI, RAT, NumAuthItems, AuthScheme, PdpTypeNr, Authorization
 %% New /7 MAR handler with optional Re-Synchronization-Info
 handle_call({mar, {IMSI, RAT, NumAuthItems, AuthScheme, PdpTypeNr, AuthorizationOpt, ResyncInfoOpt}}, {Pid, _Tag} = _From, State) ->
     SessionId = diameter:session_id(application:get_env(?ENV_APP_NAME, origin_host, ?ENV_DEFAULT_ORIG_HOST)),
-    % RFC 4005 6.11.1 Framed-IP-Address AVP:
-    % "0xFFFFFFFE indicates that the NAS should select an address for the user"
+    % RFC 4005 6.11.1 Framed-IP-Address AVP: 0xFFFFFFFE => NAS selects address
     Ipv4Dyn = <<16#FFFFFFFE:32>>,
-    % 3GPP TS 29.229 6.3.54, RFC4005 6.11.6 2.3, RFC3162 2.3 allow empty prefix.
-    % Set only the Reserved=0 byte and Prefix-Length=0
+    % IPv6 dynamic: Reserved=0, Prefix-Length=0
     IPv6Dyn = <<16#00:8,16#00:8>>,
     {IPv4Opt, IPv6Opt} =
         case PdpTypeNr of
@@ -211,21 +202,22 @@ handle_call({mar, {IMSI, RAT, NumAuthItems, AuthScheme, PdpTypeNr, Authorization
             _                            -> {[], []}
         end,
     lager:debug("Swx MAR: IPv4Opt=~p IPv6Opt=~p~n", [IPv4Opt, IPv6Opt]),
-    BaseMAR = #'MAR'{'Vendor-Specific-Application-Id' = #'Vendor-Specific-Application-Id'{
-                    'Vendor-Id'           = ?VENDOR_ID_3GPP,
-                    'Auth-Application-Id' = [?DIAMETER_APP_ID_SWX]},
+    BaseMAR = #'MAR'{
+                 'Vendor-Specific-Application-Id' = #'Vendor-Specific-Application-Id'{
+                     'Vendor-Id'           = ?VENDOR_ID_3GPP,
+                     'Auth-Application-Id' = [?DIAMETER_APP_ID_SWX]},
                  'Session-Id' = SessionId,
                  'User-Name' = IMSI,
                  'Auth-Session-State' = 1,
                  'SIP-Auth-Data-Item' = #'SIP-Auth-Data-Item'{
-                    'SIP-Authentication-Scheme' = [AuthScheme],
-                    'SIP-Authorization' = AuthorizationOpt,
-                    'Framed-IP-Address' = IPv4Opt,
-                    'Framed-IPv6-Prefix' = IPv6Opt
+                     'SIP-Authentication-Scheme' = [AuthScheme],
+                     'SIP-Authorization' = AuthorizationOpt,
+                     'Framed-IP-Address' = IPv4Opt,
+                     'Framed-IPv6-Prefix' = IPv6Opt
                  },
                  'SIP-Number-Auth-Items' = NumAuthItems,
                  'RAT-Type' = RAT
-                },
+            },
     MAR = maybe_add_resync(BaseMAR, ResyncInfoOpt),
     lager:debug("Swx Tx MAR: ~p~n", [MAR]),
     Ret = diameter_call(MAR, Pid, State),
@@ -288,14 +280,21 @@ terminate(_Reason, _State) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-%% Add Re-Synchronization-Info if provided (RAND||AUTS)
+%% Add Re-Synchronization-Info if provided (RAND||AUTS) via generic AVP bucket
+maybe_add_resync(MAR = #'MAR'{'AVP' := AVPs}, undefined) ->
+    MAR#'MAR'{'AVP' = AVPs};
+maybe_add_resync(MAR = #'MAR'{'AVP' := AVPs}, {RandBin, AutsBin})
+  when is_binary(RandBin), byte_size(RandBin) =:= 16,
+       is_binary(AutsBin), byte_size(AutsBin) =:= 14 ->
+    ResyncInfo = <<RandBin/binary, AutsBin/binary>>,  % 30 bytes
+    MAR#'MAR'{'AVP' = [{'Re-Synchronization-Info', ResyncInfo} | AVPs]};
 maybe_add_resync(MAR = #'MAR'{}, undefined) ->
     MAR;
 maybe_add_resync(MAR = #'MAR'{}, {RandBin, AutsBin})
   when is_binary(RandBin), byte_size(RandBin) =:= 16,
        is_binary(AutsBin), byte_size(AutsBin) =:= 14 ->
     ResyncInfo = <<RandBin/binary, AutsBin/binary>>,
-    MAR#'MAR'{'Re-Synchronization-Info' = ResyncInfo};
+    MAR#'MAR'{'AVP' = [{'Re-Synchronization-Info', ResyncInfo}]};
 maybe_add_resync(MAR, _Other) ->
     MAR.
 
@@ -326,4 +325,4 @@ tmod(sctp) ->
 diameter_call(Msg, Pid, State) ->
     diameter:call(?SVC_NAME, ?APP_ALIAS, Msg, [{extra, [Pid]},
                                                {timeout, State#swx_state.tx_timeout},
-                                                detach]).                                              
+                                                detach]).
